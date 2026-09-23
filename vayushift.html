@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="VayuShift: a logistics-matching engine that makes selling paddy stubble more profitable than burning it — improving air quality and farmer incomes.">
+<meta name="theme-color" content="#0B2318">
+<title>VayuShift — Selling stubble beats burning it</title>
+  <meta property="og:title" content="VayuShift — Make selling stubble more profitable" />
+  <meta property="og:description" content="VayuShift turns paddy stubble into reliable supply — making burning financially unattractive and farmers better off." />
+  <meta name="robots" content="index,follow" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="logo1.png" />
+  <!-- Leaflet map styles -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<style>
+  :root{
+    --ink:#141310;
+    --ink-soft:#4A473F;
+    --forest:#0B2318;
+    --forest-2:#123024;
+    --forest-3:#1A3F2F;
+    --ash:#EEE8DA;
+    --paper:#F5F2E9;
+    --ember:#C1602A;
+    --straw:#D9AE4A;
+    --clear:#3EAF7B;
+    --clear-2:#7BE0AE;
+    --clear-deep:#1E6B49;
+    --mist:#CBE0D3;
+    --brand-accent: #3EAF7B;
+    --line:rgba(20,19,16,0.13);
+    --line-dark:rgba(238,232,218,0.16);
+    --serif:'Fraunces', serif;
+    --sans:'IBM Plex Sans', sans-serif;
+    --mono:'IBM Plex Mono', monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; font-family:var(--sans); color:var(--ink); background:var(--paper);
+    line-height:1.5; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  ::selection{background:var(--straw); color:var(--ink);}
+  a{color:inherit;} img,svg{display:block; max-width:100%;}
+
+  /* keep system cursor for accessibility; custom cursor visuals still used */
+
+  #cursor-dot,#cursor-ring{
+    position:fixed; top:0; left:0; pointer-events:none; z-index:999;
+    border-radius:50%; transform:translate(-50%,-50%);
+  }
+  #cursor-dot{width:6px; height:6px; background:var(--ember);}
+  #cursor-ring{
+    width:34px; height:34px; border:1px solid var(--ink);
+    transition: width .25s ease, height .25s ease, border-color .25s ease, opacity .25s ease, background .25s ease;
+  }
+  #cursor-ring.on-dark-cursor{border-color:var(--ash);}
+  #cursor-ring.hovering{width:56px; height:56px; background:rgba(62,175,123,0.12); border-color:var(--clear);}
+  @media (pointer:coarse){ #cursor-dot,#cursor-ring{display:none;} }
+
+  #grain{
+    position:fixed; inset:-100px; z-index:998; pointer-events:none; opacity:0.045; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grainShift 1s steps(4) infinite;
+  }
+  @keyframes grainShift{
+    0%{transform:translate(0,0);} 25%{transform:translate(-20px,10px);}
+    50%{transform:translate(15px,-15px);} 75%{transform:translate(-10px,-10px);} 100%{transform:translate(0,0);}
+  }
+
+  .wrap{max-width:1180px; margin:0 auto; padding:0 32px; position:relative; z-index:0;}
+  /* tighter max-width for a more focused layout on large screens */
+  @media (min-width:1400px){ .wrap{max-width:1100px;} }
+  @media (max-width:720px){ .wrap{padding:0 20px;} }
+
+  /* ensure children render above any pseudo surface */
+  .wrap > *{position:relative; z-index:1;}
+  section{position:relative; z-index:1;}
+
+  h1,h2,h3{font-family:var(--serif); font-weight:600; margin:0; letter-spacing:-0.01em;}
+  h2{font-size:clamp(2.1rem, 4.4vw, 3.4rem); line-height:1.04;}
+  h3{font-size:clamp(1.25rem, 2vw, 1.6rem); line-height:1.2;}
+  p{margin:0;}
+  .lede{font-size:clamp(1.05rem,1.6vw,1.25rem); color:var(--ink-soft); max-width:640px; line-height:1.55;}
+  .on-dark .lede{color:var(--mist);}
+
+  /* ---- split text reveal ---- */
+  /* keep words inline so headings don't stack vertically */
+  .split-line{overflow:hidden; display:inline-block; margin-right:0.35ch; vertical-align:middle;}
+  .split-word{display:inline-block; transform:translateY(115%); opacity:0; transition:transform .8s cubic-bezier(.19,1,.22,1), opacity .6s ease;}
+  .split-ready .split-word{transform:translateY(0); opacity:1;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:10px; font-family:var(--sans); font-weight:600; font-size:0.95rem;
+    padding:14px 26px; border-radius:100px; border:1px solid transparent; text-decoration:none;
+    transition:transform .18s ease, background .2s ease, box-shadow .25s ease;
+  }
+  .btn:hover{box-shadow:0 10px 24px -10px rgba(11,35,24,0.45);}
+  .btn-ember{background:var(--ember); color:var(--ash);}
+  .btn-ember{background:var(--ember); color:var(--ash); box-shadow:0 12px 40px rgba(193,96,42,0.18);}
+  .btn-ember:hover{background:#A24E20; transform:translateY(-2px); box-shadow:0 20px 50px rgba(193,96,42,0.24);} 
+  .btn-line{background:transparent; color:inherit; border-color:currentColor; opacity:0.85;}
+  .btn-line:hover{opacity:1;}
+
+  /* ---- nav ---- */
+  nav{
+    position:fixed; top:0; left:0; right:0; z-index:40;
+    backdrop-filter:blur(10px); background:color-mix(in srgb, var(--paper) 80%, transparent);
+    border-bottom:1px solid var(--line);
+    transition: transform .4s cubic-bezier(.65,0,.35,1);
+  }
+  nav.nav-hidden{transform:translateY(-100%);}
+  .navbar{display:flex; align-items:center; justify-content:space-between; padding:18px 32px;}
+  .brand{display:flex; align-items:center; gap:10px; font-family:var(--serif); font-weight:600; font-size:1.15rem;}
+  .brand-logo{width:40px; height:40px; object-fit:cover; border-radius:50%; box-shadow:0 8px 24px rgba(20,19,16,0.10); background:#fff; padding:3px;}
+  .brand-name{display:inline-block; vertical-align:middle;}
+  .brand .mark{width:10px; height:10px; border-radius:50%; background:var(--ember); box-shadow:0 0 0 4px rgba(193,96,42,0.15);}
+  .navlinks{display:flex; gap:30px; font-size:0.88rem; font-weight:500;}
+  .navlinks a{text-decoration:none; opacity:0.75; transition:opacity .2s; position:relative; padding-bottom:2px;}
+  .navlinks a::after{content:""; position:absolute; left:0; right:100%; bottom:0; height:1.5px; background:var(--clear-deep); transition:right .28s ease;}
+  .navlinks a:hover{opacity:1;} .navlinks a:hover::after{right:0;}
+  @media (max-width:760px){ .navlinks{display:none;} }
+
+  body{padding-top:64px;}
+
+  /* ---- marquee ---- */
+  .marquee{
+    background:var(--forest); color:var(--ash); overflow:hidden; padding:16px 0;
+    border-top:1px solid var(--line-dark); border-bottom:1px solid var(--line-dark);
+  }
+  .marquee-track{display:flex; width:max-content; animation:marquee 26s linear infinite;}
+  .marquee span{
+    font-family:var(--mono); font-size:0.9rem; letter-spacing:0.06em; text-transform:uppercase;
+    padding:0 28px; white-space:nowrap; opacity:0.9;
+  }
+  .marquee span.accent{color:var(--clear-2);}
+  @keyframes marquee{from{transform:translateX(0);} to{transform:translateX(-50%);}}
+
+  /* ---- hero ---- */
+  .hero{padding:70px 0 40px; color:var(--ash); background:var(--forest); position:relative; overflow:hidden;}
+  .hero::before{
+    content:""; position:absolute; inset:-25%;
+    background:radial-gradient(closest-side, rgba(62,175,123,0.28), transparent 70%) 20% 25%/55% 55% no-repeat,
+               radial-gradient(closest-side, rgba(217,174,74,0.12), transparent 70%) 82% 75%/45% 45% no-repeat;
+    animation:drift 26s ease-in-out infinite; pointer-events:none;
+  }
+  @keyframes drift{0%{transform:translate(-4%,-3%) scale(1);} 50%{transform:translate(3%,4%) scale(1.08);} 100%{transform:translate(-4%,-3%) scale(1);}}
+  .hero .wrap{position:relative; z-index:1;}
+  .hero-inner{display:grid; grid-template-columns:1.3fr 1fr; gap:56px; align-items:end;}
+  @media (max-width:900px){ .hero-inner{grid-template-columns:1fr;} }
+  .hero h1{font-size:clamp(2.5rem, 6.6vw, 5.2rem); line-height:0.98; max-width:16ch; color:var(--ash);}
+  /* allow hero heading to wrap onto multiple lines for visibility */
+  .hero h1{white-space:normal; overflow:visible; text-overflow:unset; word-break:break-word;}
+  .hero-sub{margin-top:26px; font-size:1.15rem; color:var(--mist); max-width:54ch; line-height:1.6;}
+  .hero-cta{margin-top:36px; display:flex; gap:16px; flex-wrap:wrap;}
+  .hero-cta .btn-line{color:var(--ash); border-color:var(--line-dark);}
+  .hero-readout{border:1px solid var(--line-dark); border-radius:4px; padding:22px 24px; background:rgba(238,232,218,0.04);}
+  .hero-readout .label{font-size:0.78rem; color:var(--mist); letter-spacing:0.02em;}
+  .hero-readout .aqi-num{font-family:var(--mono); font-size:3rem; font-weight:600; color:var(--ember); line-height:1; margin:6px 0 4px; animation:softPulse 2.6s ease-in-out infinite;}
+  @keyframes softPulse{0%,100%{opacity:0.6;} 50%{opacity:1;}}
+  .hero-readout .aqi-tag{font-size:0.85rem; color:var(--mist);}
+  .hero-readout .divider{border-top:1px solid var(--line-dark); margin:16px 0;}
+  .hero-mini{display:flex; justify-content:space-between; font-size:0.85rem; color:var(--mist);}
+  .hero-mini b{font-family:var(--mono); color:var(--ash); display:block; font-size:1.1rem; font-weight:600;}
+
+  /* ---- section head ---- */
+  .section-head{display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin-bottom:52px; flex-wrap:wrap;}
+  .section-tag{font-family:var(--mono); font-size:0.8rem; color:var(--ember); white-space:nowrap; padding-bottom:8px;}
+  .on-clear .section-tag{color:var(--clear-deep);}
+  .section-pad{padding:64px 0;}
+  @media (max-width:720px){ .section-pad{padding:68px 0;} }
+
+  .on-dark{color:var(--ash); background:var(--forest); position:relative; overflow:hidden;}
+  .on-dark::before{
+    content:""; position:absolute; inset:-20%;
+    background:radial-gradient(closest-side, rgba(62,175,123,0.20), transparent 70%) 15% 20%/45% 45% no-repeat,
+               radial-gradient(closest-side, rgba(217,174,74,0.09), transparent 70%) 85% 75%/40% 40% no-repeat;
+    animation:drift 22s ease-in-out infinite; pointer-events:none; z-index:0;
+  }
+  .on-dark > .wrap{position:relative; z-index:1;}
+
+  /* ---- giant ledger stats ---- */
+  .ledger{border-top:1px solid var(--line);}
+  .on-dark .ledger{border-top:1px solid var(--line-dark);}
+  .ledger-row{
+    display:grid; grid-template-columns:220px 1fr 1.3fr; gap:28px; padding:38px 0;
+    border-bottom:1px solid var(--line); align-items:center;
+  }
+  .on-dark .ledger-row{border-bottom:1px solid var(--line-dark);}
+  @media (max-width:820px){ .ledger-row{grid-template-columns:1fr; gap:10px;} }
+  .ledger-row .num{
+    font-family:var(--mono); font-size:clamp(3rem, 7vw, 5.5rem); font-weight:600; color:var(--ember);
+    line-height:1; opacity:0; transform:translateY(14px); transition:opacity .7s ease, transform .7s ease; letter-spacing:-0.02em;
+  }
+  .ledger-row.in-view .num{opacity:1; transform:translateY(0);}
+  .ledger-row .stat-label{font-weight:600; font-size:1.05rem;}
+  .ledger-row .stat-note{color:var(--ink-soft); font-size:0.95rem; max-width:52ch;}
+  .on-dark .ledger-row .stat-note{color:var(--mist);}
+
+  /* ---- AQI scale (real CPCB category breakpoints) ---- */
+  .aqi-scale{margin-top:64px;}
+  .aqi-scale-head{margin-bottom:24px;}
+  .aqi-scale-head h4{font-family:var(--sans); font-weight:600; font-size:1.05rem; margin:0 0 6px; color:var(--ash);}
+  .aqi-scale-head p{color:var(--mist); font-size:0.95rem; max-width:56ch;}
+  .aqi-bar{display:flex; height:76px; border-radius:4px; overflow:visible; position:relative; margin-top:56px;}
+  .aqi-seg{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    color:var(--ash); font-family:var(--mono); text-align:center; overflow:hidden;
+  }
+  .aqi-seg:first-child{border-radius:4px 0 0 4px;}
+  .aqi-seg:last-child{border-radius:0 4px 4px 0;}
+  .aqi-seg span{font-size:0.72rem; font-weight:600; white-space:nowrap;}
+  .aqi-seg small{font-size:0.65rem; opacity:0.85;}
+  .aqi-marker{position:absolute; top:-64px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center;}
+  .aqi-marker-label{
+    font-family:var(--mono); font-size:0.72rem; color:var(--ash); text-align:center; line-height:1.35;
+    background:var(--forest-2); border:1px solid var(--line-dark); border-radius:4px; padding:6px 10px; white-space:nowrap;
+  }
+  .aqi-marker-label b{color:var(--ember); font-size:0.95rem;}
+  .aqi-marker-pip{width:2px; height:20px; background:var(--ember); margin-top:2px; position:relative;}
+  .aqi-marker-pip::after{
+    content:""; position:absolute; bottom:-4px; left:50%; transform:translateX(-50%);
+    width:8px; height:8px; border-radius:50%; background:var(--ember); animation:pulseDot 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(193,96,42,0.55);} 50%{box-shadow:0 0 0 7px rgba(193,96,42,0);}}
+  @media (max-width:640px){
+    .aqi-seg span{font-size:0.6rem;} .aqi-seg small{display:none;}
+    .aqi-marker-label{font-size:0.62rem;}
+  }
+
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:28px;}
+  @media (max-width:900px){ .two-col{grid-template-columns:1fr;} }
+
+  /* ---- unit economics ledger (replaces charts) ---- */
+  .econ-block{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line-dark); border:1px solid var(--line-dark); border-radius:4px; overflow:hidden;}
+  @media (max-width:860px){ .econ-block{grid-template-columns:1fr;} }
+  .econ-col{background:var(--forest-2); padding:34px 30px; color:var(--ash);}
+  .econ-col h4{font-family:var(--sans); font-weight:600; font-size:0.78rem; margin:0 0 22px; color:var(--mist); text-transform:uppercase; letter-spacing:0.04em;}
+  .cost-row{display:flex; justify-content:space-between; padding:13px 0; border-bottom:1px solid var(--line-dark); font-size:0.98rem; color:var(--ash);}
+  .cost-row b{font-family:var(--mono); font-weight:600; color:var(--ash);}
+  .cost-row.total{font-weight:700; border-bottom:none; padding-top:18px;}
+  .cost-row.total b{font-size:1.6rem;}
+  .econ-col.bad .cost-row.total b{color:var(--ember);}
+  .econ-col.good .cost-row.total b{color:var(--clear-2);}
+  .source-note{font-family:var(--mono); font-size:0.72rem; color:var(--mist); margin-top:18px; opacity:0.8;}
+
+  /* ---- datasets ---- */
+  .dataset-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line);}
+  @media (max-width:820px){ .dataset-grid{grid-template-columns:1fr;} }
+  .dataset-cell{background:var(--paper); padding:34px 28px; transition:background .3s ease, transform .3s ease;}
+  .dataset-cell:hover{background:var(--ash); transform:translateY(-3px);}
+  .dataset-cell .tag{font-family:var(--mono); font-size:0.75rem; color:var(--clear-deep); margin-bottom:14px; display:block; transition:letter-spacing .3s ease;}
+  .dataset-cell:hover .tag{letter-spacing:0.03em;}
+  .dataset-cell h3{margin-bottom:10px; font-size:1.25rem;}
+  .dataset-cell p{color:var(--ink-soft); font-size:0.95rem;}
+
+  /* ---- steps ---- */
+  .steps{counter-reset:step; display:flex; flex-direction:column;}
+  .step{display:grid; grid-template-columns:64px 1fr; gap:24px; padding:36px 0; border-bottom:1px solid var(--line); transition:padding-left .3s ease, background .3s ease;}
+  .step:first-child{border-top:1px solid var(--line);}
+  .step:hover{padding-left:10px; background:rgba(62,175,123,0.05);}
+  .step .step-num{counter-increment:step; font-family:var(--mono); font-size:1rem; color:var(--clear-deep); transition:transform .3s ease;}
+  .step .step-num::before{content:counter(step, decimal-leading-zero);}
+  .step:hover .step-num{transform:scale(1.15);}
+  .step h3{margin-bottom:8px;} .step p{color:var(--ink-soft); max-width:60ch;}
+
+  /* ---- money flow ---- */
+  .flow-strip{display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:center; gap:18px; padding:40px 30px; border:1px solid var(--line); border-radius:4px; background:var(--ash);}
+  @media (max-width:820px){ .flow-strip{grid-template-columns:1fr; text-align:center;} .flow-arrow{transform:rotate(90deg);} }
+  .flow-node{text-align:center;}
+  .flow-node .amt{font-family:var(--mono); font-size:1.6rem; font-weight:600;}
+  .flow-node .who{font-size:0.85rem; color:var(--ink-soft); margin-top:6px;}
+  .flow-arrow{color:var(--ink-soft); font-size:1.4rem;}
+  .flow-node.buyer .amt{color:var(--ink);}
+  .flow-node.transport .amt{color:var(--ember);}
+  .flow-node.farmer .amt{color:var(--clear-deep);}
+
+  .zero-banner{margin-top:40px; display:flex; align-items:center; justify-content:space-between; gap:24px; padding:28px 30px; border:1px solid var(--forest); border-radius:4px; background:var(--forest); color:var(--ash); flex-wrap:wrap; animation:breathe 3.6s ease-in-out infinite;}
+  @keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(62,175,123,0);} 50%{box-shadow:0 0 34px 4px rgba(62,175,123,0.25);}}
+  .zero-banner .big{font-family:var(--serif); font-size:1.8rem;}
+  .zero-banner .match-cost{font-family:var(--mono); font-size:0.85rem; color:var(--mist); text-align:right;}
+
+  /* ---- calculator ---- */
+  .calc-panel{display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--line); border-radius:4px; overflow:hidden;}
+  @media (max-width:860px){ .calc-panel{grid-template-columns:1fr;} }
+  .calc-inputs{background:var(--ash); padding:44px 36px;}
+  .calc-output{background:var(--forest-2); color:var(--ash); padding:44px 36px; display:flex; flex-direction:column; justify-content:center;}
+  .slider-group{margin-bottom:36px;} .slider-group:last-child{margin-bottom:0;}
+  .slider-label{display:flex; justify-content:space-between; font-size:0.92rem; font-weight:600; margin-bottom:14px;}
+  .slider-label .val{font-family:var(--mono); color:var(--ember);}
+  input[type=range]{-webkit-appearance:none; width:100%; height:3px; background:var(--line); border-radius:2px; outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--ember); cursor:none; border:3px solid var(--ash); box-shadow:0 0 0 1px var(--ember);}
+  input[type=range]::-moz-range-thumb{width:20px; height:20px; border-radius:50%; background:var(--ember); border:3px solid var(--ash); box-shadow:0 0 0 1px var(--ember);}
+  .out-row{display:flex; justify-content:space-between; padding:15px 0; border-bottom:1px solid var(--line-dark); font-size:0.95rem;}
+  .out-row:first-child{border-top:1px solid var(--line-dark);}
+  .out-row b{font-family:var(--mono);}
+  .out-row.net{font-size:1.15rem; padding:22px 0;}
+  .out-row.net b{font-size:clamp(2rem,4vw,2.8rem); color:var(--clear-2); display:inline-block; transition:transform .18s ease;}
+  .out-row.net b.bump{transform:scale(1.12);}
+  .out-farmer-cost{margin-top:18px; font-size:0.85rem; color:var(--mist);}
+  .out-farmer-cost b{color:var(--straw); font-family:var(--mono);}
+
+  /* ---- closing ---- */
+  .closing{padding:80px 0 60px; color:var(--ash); text-align:left; background:var(--forest); position:relative; overflow:hidden; z-index:60;}
+  .closing::before{content:""; position:absolute; inset:-20%; background:radial-gradient(closest-side, rgba(123,224,174,0.20), transparent 70%) 75% 25%/50% 50% no-repeat; animation:drift 24s ease-in-out infinite reverse; pointer-events:none;}
+  .closing .wrap{position:relative; z-index:1;}
+  .closing h2{max-width:17ch; font-size:clamp(2.2rem, 5vw, 4rem);}
+  .closing .lede{color:var(--mist); margin-top:22px;}
+  .closing .btn-ember{margin-top:36px; animation:breathe 3.2s ease-in-out infinite;}
+  .closing-meta{display:flex; gap:56px; margin-top:74px; padding-top:36px; border-top:1px solid var(--line-dark); flex-wrap:wrap;}
+  .closing-meta .m-label{font-size:0.78rem; color:var(--mist); margin-bottom:6px;}
+  .closing-meta .m-val{font-family:var(--serif); font-size:1.15rem;}
+
+  footer{padding:28px 0; border-top:1px solid var(--line); color:var(--ink-soft); font-size:0.82rem; background:var(--paper);}
+  footer .wrap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:center;}
+  footer .brand-brief{font-weight:600;}
+
+  [data-reveal]{opacity:0; transform:translateY(16px); transition:opacity .7s ease, transform .7s ease;}
+  [data-reveal].in-view{opacity:1; transform:translateY(0);}
+
+  /* directional reveal animations */
+  @keyframes slideUp { from{opacity:0; transform:translateY(18px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes slideDown { from{opacity:0; transform:translateY(-18px);} to{opacity:1; transform:translateY(0);} }
+  .in-view.in-view-down{ animation-name: slideUp; animation-duration: 640ms; animation-timing-function: cubic-bezier(.19,1,.22,1); animation-fill-mode: both; }
+  .in-view.in-view-up{ animation-name: slideDown; animation-duration: 640ms; animation-timing-function: cubic-bezier(.19,1,.22,1); animation-fill-mode: both; }
+
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+    .split-word{transform:translateY(0) !important; opacity:1 !important;}
+  }
+  /* interactive background canvas — sit behind content */
+  /* place canvas above section backgrounds but below textual content */
+  #bg-canvas{position:fixed; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; opacity:0.55; mix-blend-mode:normal;}
+
+  /* ensure pseudo backgrounds sit below the canvas and actual content sits above it */
+  .wrap::before{z-index:1}
+  .wrap > *{position:relative; z-index:4;}
+
+  /* paper-surface: layered subtle background for light sections (exclude intentionally dark sections like .closing) */
+  section:not(.on-dark):not(.closing) .wrap::before{
+    content:""; position:absolute; inset:-8px; border-radius:12px; z-index:0; pointer-events:none;
+    background: linear-gradient(180deg, var(--paper) 0%, color-mix(in srgb, var(--paper) 96%, #fff 4%));
+    box-shadow: 0 10px 30px rgba(20,19,16,0.035), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  /* dataset cards on white areas — slightly raised */
+  .dataset-cell{background: linear-gradient(180deg, var(--paper) 0%, color-mix(in srgb, var(--paper) 98%, #fff 2%)); border-radius:10px; box-shadow:0 8px 30px rgba(20,19,16,0.06); transition:transform .28s ease, box-shadow .28s ease; overflow:hidden;}
+  .dataset-cell:hover{transform:translateY(-6px); box-shadow:0 18px 50px rgba(20,19,16,0.09);}
+
+  /* lift footer slightly on white background */
+  footer .wrap{background:linear-gradient(180deg, color-mix(in srgb, var(--paper) 98%, #fff 2%), var(--paper)); border-radius:8px; padding:14px 32px; box-shadow:0 6px 22px rgba(20,19,16,0.04);}  
+  /* Skip link and focus-visible styles */
+  .skip-link{
+    position:fixed; left:12px; top:12px; z-index:9999; background:#fff; color:var(--ink); padding:8px 12px; border-radius:4px; box-shadow:0 6px 18px rgba(20,19,16,0.08); transform:translateY(-120%); transition:transform .18s ease; text-decoration:none; font-weight:600;
+  }
+  .skip-link:focus{transform:translateY(0); outline:2px solid var(--ember);}
+  a:focus-visible, button:focus-visible, input:focus-visible{outline:3px solid var(--clear-2); outline-offset:3px;}
+
+  /* intro overlay / preloader video */
+  /* intro overlay / preloader video with fade in/out */
+  #intro-overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:var(--forest); z-index:99999;
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .6s ease, visibility .6s ease;
+  }
+  #intro-overlay.show{opacity:1; visibility:visible; pointer-events:auto;}
+  #intro-overlay video{width:100%; height:100%; object-fit:cover; max-width:1400px; max-height:100vh;}
+  .intro-skip{position:fixed; right:24px; top:24px; z-index:100000; background:rgba(255,255,255,0.95); border:0; padding:10px 14px; border-radius:8px; font-weight:600; cursor:pointer;}
+  @media (max-width:640px){ .intro-skip{right:12px; top:12px; padding:8px 10px;} }
+
+  /* map container */
+  #map{width:100%; height:420px; border-radius:10px; border:1px solid var(--line);}
+</style>
+</head>
+<body>
+<div id="cursor-ring"></div>
+<div id="cursor-dot"></div>
+<div id="grain"></div>
+
+  <!-- Intro video overlay: place a file named video1.mp4 next to this HTML (or update the src). -->
+  <div id="intro-overlay" role="dialog" aria-label="Intro video" aria-hidden="false">
+    <video id="intro-video" preload="auto" playsinline muted poster="intro-poster.jpg">
+      <source src="video1.mp4" type="video/mp4">
+      Your browser does not support the intro video.
+    </video>
+    <button class="intro-skip" id="intro-skip" aria-label="Skip intro">Skip</button>
+  </div>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- interactive background canvas (particles) -->
+  <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<nav id="siteNav" role="navigation" aria-label="Main navigation">
+  <div class="navbar wrap">
+  <div class="brand"><img src="logo1.png" alt="VayuShift logo" class="brand-logo"><span class="brand-name">VayuShift</span></div>
+    <div class="navlinks">
+      <a href="#crisis">The crisis</a>
+      <a href="#solution">How it works</a>
+      <a href="#calculator">Earnings</a>
+      <a href="#model">Revenue</a>
+    </div>
+    <a href="#calculator" class="btn btn-ember magnetic" style="padding:10px 20px; font-size:0.85rem;" aria-label="See a payout calculator">See a payout</a>
+  </div>
+</nav>
+
+<main id="main">
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-inner">
+      <div>
+        <h1 class="hero-heading">Burning fields was the easy choice,<br>but VayuShift makes selling stubble the smarter, profitable one.</h1>
+        <p class="hero-sub">We convert agricultural residue into predictable revenue for farmers by matching supply, route and buyers — making burning economically unattractive.</p>
+        <div class="hero-cta">
+          <a href="#calculator" class="btn btn-ember magnetic">Calculate a farmer's payout</a>
+          <a href="#crisis" class="btn btn-line magnetic">See the crisis, in numbers</a>
+        </div>
+      </div>
+      <div class="hero-readout">
+        <div class="label">Delhi-NCR, peak burning weeks</div>
+        <div class="aqi-num">400+</div>
+        <div class="aqi-tag">AQI routinely crosses this line every Oct–Nov</div>
+        <div class="divider"></div>
+        <div class="hero-mini">
+          <div><b>~45%</b>of peak PM2.5</div>
+          <div><b>₹0</b>cost to farmers</div>
+          <div><b>₹1</b>cost of a matchbox</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>AQI 400+ EVERY OCTOBER</span>
+    <span class="accent">₹0 COST TO FARMERS</span>
+    <span>45% OF PEAK PM2.5</span>
+    <span class="accent">NASA FIRMS · MNRE · AGRI CENSUS</span>
+    <span>AQI 400+ EVERY OCTOBER</span>
+    <span class="accent">₹0 COST TO FARMERS</span>
+    <span>45% OF PEAK PM2.5</span>
+    <span class="accent">NASA FIRMS · MNRE · AGRI CENSUS</span>
+  </div>
+</div>
+
+<section id="crisis" class="section-pad on-dark">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 data-split>Every October, the sky over Delhi fills with someone else's harvest.</h2>
+      <div class="section-tag">01 — the crisis</div>
+    </div>
+    <p class="lede" style="margin-bottom:20px;">Punjab, Haryana and Western UP harvest paddy in a tight window before the wheat crop must go in. Clearing the stubble by burning it takes a matchbox and an afternoon. Clearing it any other way, until now, has cost more than farmers can recover.</p>
+
+    <div class="ledger">
+      <div class="ledger-row" data-reveal>
+        <div class="num" data-count="45" data-suffix="%">0%</div>
+        <div class="stat-label">of Delhi-NCR's peak PM2.5</div>
+        <div class="stat-note">comes from post-harvest paddy burning in Punjab, Haryana and Western UP during the six-week burning season.</div>
+      </div>
+      <div class="ledger-row" data-reveal>
+        <div class="num" data-count="400" data-suffix="+">0</div>
+        <div class="stat-label">AQI, routinely, every season</div>
+        <div class="stat-note">Delhi's air quality index crosses the "severe" threshold on the worst burning days — a level associated with serious health risk for the entire population, not just vulnerable groups.</div>
+      </div>
+      <div class="ledger-row" data-reveal>
+        <div class="num" data-count="40" data-suffix=" km">0 km</div>
+        <div class="stat-label">is where the old economics collapsed</div>
+        <div class="stat-note">Past this distance, trucking the stubble to a buyer has typically cost more than the buyer pays for it. Burning became the rational choice, not the reckless one.</div>
+      </div>
+    </div>
+
+    <div class="aqi-scale" data-reveal>
+      <div class="aqi-scale-head">
+        <h4>India's National AQI scale</h4>
+        <p>Delhi-NCR's peak burning-season readings land squarely in the "Severe" band — the highest category on the scale.</p>
+      </div>
+      <div class="aqi-bar">
+        <div class="aqi-seg" style="width:10%; background:#4CAF50;"><span>Good</span><small>0–50</small></div>
+        <div class="aqi-seg" style="width:10%; background:#8BC34A;"><span>Satisfactory</span><small>51–100</small></div>
+        <div class="aqi-seg" style="width:20%; background:#FFC107; color:#141310;"><span>Moderate</span><small>101–200</small></div>
+        <div class="aqi-seg" style="width:20%; background:#FF7043;"><span>Poor</span><small>201–300</small></div>
+        <div class="aqi-seg" style="width:20%; background:#E53935;"><span>Very Poor</span><small>301–400</small></div>
+        <div class="aqi-seg" style="width:20%; background:#7B241C;"><span>Severe</span><small>401–500</small></div>
+        <div class="aqi-marker" style="left:80%;">
+          <div class="aqi-marker-label">Delhi-NCR<br>peak weeks<br><b>400+</b></div>
+          <div class="aqi-marker-pip"></div>
+        </div>
+      </div>
+      <div class="source-note">SOURCE — CPCB National Air Quality Index category breakpoints</div>
+    </div>
+  </div>
+</section>
+
+  <!-- Interactive map to show sample locations -->
+  <section id="map-section" class="section-pad on-clear">
+    <div class="wrap">
+      <div class="section-head on-clear">
+        <h2 data-split>Our target locations</h2>
+        <div class="section-tag">04 — Target locations</div>
+      </div>
+      <p class="lede" style="margin-bottom:18px;">Explore our priority regions and sample coordinates. Click any marker to see operational details and cluster insights.</p>
+      <div id="map" role="region" aria-label="Interactive map showing sample locations"></div>
+    </div>
+  </section>
+
+<section class="section-pad on-dark">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 data-split>Everyone has tried to pay farmers not to burn. The math kept saying burn.</h2>
+      <div class="section-tag">02 — why it failed</div>
+    </div>
+    <p class="lede" style="margin-bottom:44px;">A biomass plant pays roughly ₹1,500–2,000 per tonne for stubble. Trucking it there costs ₹10–15 per tonne, per kilometre. Run those two numbers against each other at 40 km and the old model breaks. Aggregate into full truckloads and route it well, and the same 40 km stays profitable.</p>
+
+    <div class="econ-block" data-reveal>
+      <div class="econ-col bad">
+        <h4>Old model — single farm, part-load, 40 km</h4>
+        <div class="cost-row"><span>Buyer pays, per tonne</span><b>₹1,500</b></div>
+        <div class="cost-row"><span>Loading &amp; local handling</span><b>−₹900</b></div>
+        <div class="cost-row"><span>Transport, ₹15/tonne-km × 40 km</span><b>−₹600</b></div>
+        <div class="cost-row total"><span>Net to farmer</span><b>₹0</b></div>
+      </div>
+      <div class="econ-col good">
+        <h4>VayuShift — clustered, full truckload, 40 km</h4>
+        <div class="cost-row"><span>Buyer pays, per tonne</span><b>₹1,750</b></div>
+        <div class="cost-row"><span>Loading &amp; handling, shared across load</span><b>−₹310</b></div>
+        <div class="cost-row"><span>Transport, ₹11/tonne-km × 40 km</span><b>−₹440</b></div>
+        <div class="cost-row total"><span>Net to farmer</span><b>₹1,000</b></div>
+      </div>
+    </div>
+    <div class="source-note">Figures illustrate the stated payout range (₹1,500–2,000/tonne) and transport rate range (₹10–15/tonne-km) from field data; full-truckload aggregation is what changes the outcome at the same distance.</div>
+  </div>
+</section>
+
+<section id="solution" class="section-pad">
+  <div class="wrap">
+    <div class="section-head on-clear">
+      <h2 data-split>We don't move stubble. We move information about where it already is.</h2>
+      <div class="section-tag">03 — the solution</div>
+    </div>
+    <p class="lede" style="margin-bottom:56px;">VayuShift is a matching engine, not a trucking company. It combines three public datasets to see, before anyone burns anything, exactly which fields have surplus stubble, which plants need it, and which route between them still leaves a profit.</p>
+  </div>
+
+  <div class="wrap" style="padding:0;">
+    <div class="dataset-grid">
+      <div class="dataset-cell" data-reveal>
+        <span class="tag">DATASET 01</span>
+        <h3>NASA FIRMS</h3>
+        <p>Real-time satellite fire-hotspot data flags exactly where and when stubble is being burned — and, read the right way, where it's about to be.</p>
+      </div>
+      <div class="dataset-cell" data-reveal>
+        <span class="tag">DATASET 02</span>
+        <h3>MNRE directories</h3>
+        <p>Public records of every biomass power plant's location and intake capacity, so we know who's buying, how much, and how close they are.</p>
+      </div>
+      <div class="dataset-cell" data-reveal>
+        <span class="tag">DATASET 03</span>
+        <h3>Agricultural Census</h3>
+        <p>District-level residue density tells us where stubble is concentrated enough to fill a truck without driving farm to farm to do it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" style="margin-top:84px;">
+    <h3 style="margin-bottom:8px;">How a tonne of stubble finds a buyer</h3>
+    <p class="lede" style="margin-bottom:8px;">Four steps, run automatically every burning season.</p>
+    <div class="steps">
+      <div class="step" data-reveal>
+        <div class="step-num"></div>
+        <div><h3>Farmer lists on WhatsApp</h3><p>No app, no login, no literacy barrier. A farmer messages a WhatsApp bot with village, quantity, and moisture — the same way they'd message a relative.</p></div>
+      </div>
+      <div class="step" data-reveal>
+        <div class="step-num"></div>
+        <div><h3>We cluster nearby listings</h3><p>Individual fields rarely fill a truck. The engine groups listings within a village cluster until they add up to a full, economical load.</p></div>
+      </div>
+      <div class="step" data-reveal>
+        <div class="step-num"></div>
+        <div><h3>We route to the plant that clears a margin</h3><p>Cross-referencing MNRE plant capacity and live fire-hotspot pressure, the engine picks the buyer and route that leaves a guaranteed positive payout — before a truck ever moves.</p></div>
+      </div>
+      <div class="step" data-reveal>
+        <div class="step-num"></div>
+        <div><h3>Buyer pays, farmer is paid</h3><p>The biomass plant pays for the load. Transport is deducted at the source. The remainder reaches the farmer or aggregator — the same week, not the same season.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="model" class="section-pad">
+  <div class="wrap">
+    <div class="section-head on-clear">
+      <h2 data-split>Farmers never pay us. Plants do.</h2>
+      <div class="section-tag">05 — the economic model</div>
+    </div>
+    <p class="lede" style="margin-bottom:48px;">One payment moves through the chain. It starts at the buyer and ends with the farmer keeping what's left. VayuShift's fee sits outside that flow entirely.</p>
+
+    <div class="flow-strip" data-reveal>
+      <div class="flow-node buyer"><div class="amt">₹1,500–2,000</div><div class="who">Biomass plant pays, per tonne</div></div>
+      <div class="flow-arrow">&#8212;</div>
+      <div class="flow-node transport"><div class="amt">− transport</div><div class="who">Deducted at source, route-optimised</div></div>
+      <div class="flow-arrow">&#8212;</div>
+      <div class="flow-node farmer"><div class="amt">= net payout</div><div class="who">Reaches farmer / aggregator</div></div>
+    </div>
+
+    <div class="zero-banner">
+      <div class="big">Zero cost to farmers. Ever.</div>
+      <div class="match-cost">A matchbox costs ₹1.<br>Listing with VayuShift costs ₹0 — it has to.</div>
+    </div>
+
+    <div style="margin-top:56px; max-width:640px;" data-reveal>
+      <h3 style="margin-bottom:14px;">Where VayuShift actually makes money</h3>
+      <p style="color:var(--ink-soft);">We charge biomass plants a B2B sourcing fee — a fraction of what they'd otherwise spend building and running their own procurement network — for a reliable, pre-aggregated supply of stubble delivered on schedule. The farmer's payout is never touched.</p>
+    </div>
+  </div>
+</section>
+
+<section id="calculator" class="section-pad on-dark">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 data-split>What does this look like for one farmer, this season?</h2>
+      <div class="section-tag">06 — earnings calculator</div>
+    </div>
+    <p class="lede" style="margin-bottom:44px;">Move the sliders to match a real listing — tonnage from one field or a clustered group, distance to the nearest matched plant.</p>
+
+    <div class="calc-panel" data-reveal>
+      <div class="calc-inputs">
+        <div class="slider-group">
+          <div class="slider-label"><span>Stubble listed</span><span class="val"><span id="tonnageVal">8</span> tonnes</span></div>
+              <input type="range" id="tonnageSlider" min="1" max="30" value="8" step="1" aria-label="Stubble listed in tonnes">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Distance to matched plant</span><span class="val"><span id="distanceVal">25</span> km</span></div>
+              <input type="range" id="distanceSlider" min="5" max="150" value="25" step="5" aria-label="Distance to matched plant in kilometres">
+        </div>
+      </div>
+      <div class="calc-output">
+        <div class="out-row"><span>Gross sale value</span><b id="outGross">₹0</b></div>
+        <div class="out-row"><span>Route-optimised transport</span><b id="outTransport">− ₹0</b></div>
+        <div class="out-row net"><span>Net payout to farmer</span><b id="outNet">₹0</b></div>
+        <div class="out-farmer-cost">Cost to the farmer to list, match, and get paid: <b>₹0</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap">
+    <h2 data-split>The air doesn't clear because of a policy. It clears because burning stopped paying better.</h2>
+    <p class="lede">VayuShift exists to make sure that's true for every field within reach of a plant this October.</p>
+    <a href="#calculator" class="btn btn-ember magnetic">Run the numbers again</a>
+    <div class="closing-meta">
+      <div><div class="m-label">Starting with</div><div class="m-val">Punjab · Haryana · W. UP</div></div>
+      <div><div class="m-label">Season</div><div class="m-val">Oct–Nov</div></div>
+    </div>
+  </div>
+</section>
+
+  </main>
+
+  <footer><div class="wrap"><span>VayuShift</span><span>Smart logistics for cleaner air</span></div></footer>
+
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Organization","name":"VayuShift","url":"https://example.com","description":"VayuShift matches agricultural residue to buyers, reducing burning and improving farmer incomes.","sameAs":[]}
+  </script>
+
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer>
+document.addEventListener('DOMContentLoaded', () => {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isFinePointer = window.matchMedia('(pointer: fine)').matches;
+
+  /* ---------- INTRO VIDEO PLAY-ON-LOAD OVERLAY ---------- */
+  (function(){
+    const overlay = document.getElementById('intro-overlay');
+    const video = document.getElementById('intro-video');
+    const skipBtn = document.getElementById('intro-skip');
+    if(!overlay || !video) return;
+
+    // Respect reduced-motion: do not show the intro
+    if(reduceMotion){ overlay.classList.add('hidden'); overlay.setAttribute('aria-hidden','true'); return; }
+
+    // Prevent scrolling while intro is visible
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    function endIntro(){
+      if(!overlay) return;
+      // start fade-out by removing the 'show' class
+      overlay.classList.remove('show');
+      overlay.setAttribute('aria-hidden','true');
+      // restore scrolling
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      try{ video.pause(); video.currentTime = 0; }catch(e){}
+      // remove after transition finishes
+      const removeAfter = () => { if(overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+      overlay.addEventListener('transitionend', function onT(){ overlay.removeEventListener('transitionend', onT); removeAfter(); });
+      // safety fallback
+      setTimeout(removeAfter, 900);
+    }
+
+    // Skip control
+    if(skipBtn) skipBtn.addEventListener('click', endIntro);
+
+    // If video naturally ends, transition out
+    video.addEventListener('ended', endIntro);
+
+    // If playback errors or is blocked, hide overlay quickly
+    video.addEventListener('error', endIntro);
+
+    // show with fade-in
+    requestAnimationFrame(()=> overlay.classList.add('show'));
+
+    // Try to autoplay; if blocked, fallback to hiding the overlay after a short delay
+    const tryPlay = video.play();
+    if(tryPlay !== undefined){
+      tryPlay.then(()=>{ video.muted = true; }).catch(()=>{ setTimeout(endIntro, 600); });
+    }
+
+    // Safety timeout so the overlay never blocks the site for long
+    setTimeout(()=>{ if(overlay && overlay.classList.contains('show')) endIntro(); }, 8000);
+  })();
+
+  /* ---------- CUSTOM CURSOR ---------- */
+  if(isFinePointer && !reduceMotion){
+    const dot = document.getElementById('cursor-dot');
+    const ring = document.getElementById('cursor-ring');
+    let mx=0,my=0, rx=0, ry=0;
+    window.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; dot.style.left=mx+'px'; dot.style.top=my+'px'; });
+    function loop(){ rx += (mx-rx)*0.18; ry += (my-ry)*0.18; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(loop); }
+    loop();
+    document.querySelectorAll('a, button, input[type=range]').forEach(el => {
+      el.addEventListener('mouseenter', () => ring.classList.add('hovering'));
+      el.addEventListener('mouseleave', () => ring.classList.remove('hovering'));
+    });
+    document.querySelectorAll('.on-dark, .hero, .closing').forEach(el => {
+      el.addEventListener('mouseenter', () => ring.classList.add('on-dark-cursor'));
+      el.addEventListener('mouseleave', () => ring.classList.remove('on-dark-cursor'));
+    });
+  } else {
+    document.getElementById('cursor-dot').style.display='none';
+    document.getElementById('cursor-ring').style.display='none';
+  }
+
+  /* ---------- MAGNETIC BUTTONS ---------- */
+  if(isFinePointer && !reduceMotion){
+    document.querySelectorAll('.magnetic').forEach(el => {
+      el.addEventListener('mousemove', e => {
+        const r = el.getBoundingClientRect();
+        const relX = e.clientX - r.left - r.width/2;
+        const relY = e.clientY - r.top - r.height/2;
+        el.style.transform = `translate(${relX*0.25}px, ${relY*0.35}px)`;
+      });
+      el.addEventListener('mouseleave', () => { el.style.transition='transform .35s cubic-bezier(.34,1.56,.64,1)'; el.style.transform='translate(0,0)'; });
+      el.addEventListener('mouseenter', () => { el.style.transition='none'; });
+    });
+  }
+
+  /* ---------- NAV HIDE ON SCROLL ---------- */
+  const nav = document.getElementById('siteNav');
+  let lastY = window.scrollY;
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    if(y > lastY && y > 120){ nav.classList.add('nav-hidden'); }
+    else{ nav.classList.remove('nav-hidden'); }
+    lastY = y;
+  }, {passive:true});
+
+  /* ---------- SPLIT TEXT REVEAL ---------- */
+  document.querySelectorAll('[data-split]').forEach(el => {
+    const words = el.textContent.trim().split(/\s+/);
+    el.innerHTML = words.map(w => `<span class="split-line"><span class="split-word">${w}</span></span>`).join(' ');
+    const spans = el.querySelectorAll('.split-word');
+    spans.forEach((s,i) => s.style.transitionDelay = (i*35)+'ms');
+  });
+  const splitIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('split-ready'); splitIO.unobserve(e.target); } });
+  }, {threshold:0.3});
+  document.querySelectorAll('[data-split]').forEach(el => splitIO.observe(el));
+
+  /* ---------- SCROLL REVEAL (staggered) ---------- */
+  document.querySelectorAll('.ledger, .dataset-grid, .steps').forEach(group => {
+    group.querySelectorAll('.ledger-row, .dataset-cell, .step').forEach((el,i) => { el.style.transitionDelay = (i*90)+'ms'; });
+  });
+  const revealEls = document.querySelectorAll('[data-reveal], .ledger-row, .dataset-cell, .step');
+  // toggle .in-view when elements enter/leave viewport so animations run on scroll down and up
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if(entry.isIntersecting){
+        entry.target.classList.add('in-view');
+      } else {
+        entry.target.classList.remove('in-view');
+      }
+    });
+  }, {threshold:0.15});
+  revealEls.forEach(el => io.observe(el));
+
+  /* ---------- COUNT-UP ---------- */
+  const cio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        const el = e.target;
+        const target = parseInt(el.getAttribute('data-count'), 10);
+        const suffix = el.getAttribute('data-suffix') || '';
+        const dur = 1100; const start = performance.now();
+        function tick(now){
+          const p = Math.min(1, (now-start)/dur); const eased = 1 - Math.pow(1-p, 3);
+          el.textContent = Math.round(target*eased) + suffix;
+          if(p<1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick); cio.unobserve(el);
+      }
+    });
+  }, {threshold:0.4});
+  document.querySelectorAll('[data-count]').forEach(el => cio.observe(el));
+
+  /* ---------- CALCULATOR ---------- */
+  const tonnageSlider = document.getElementById('tonnageSlider');
+  const distanceSlider = document.getElementById('distanceSlider');
+  const tonnageVal = document.getElementById('tonnageVal');
+  const distanceVal = document.getElementById('distanceVal');
+  const outGross = document.getElementById('outGross');
+  const outTransport = document.getElementById('outTransport');
+  const outNet = document.getElementById('outNet');
+  const PAYOUT_PER_TONNE = 1750;
+  const TRANSPORT_RATE_PER_KM_TONNE = 11;
+  function formatINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  function updateCalc(){
+    const t = parseFloat(tonnageSlider.value); const d = parseFloat(distanceSlider.value);
+    tonnageVal.textContent = t; distanceVal.textContent = d;
+    const gross = t * PAYOUT_PER_TONNE; const transport = t * d * TRANSPORT_RATE_PER_KM_TONNE;
+    const net = Math.max(0, gross - transport);
+    outGross.textContent = formatINR(gross); outTransport.textContent = '− ' + formatINR(transport); outNet.textContent = formatINR(net);
+    outNet.classList.add('bump'); setTimeout(() => outNet.classList.remove('bump'), 180);
+  }
+  tonnageSlider.addEventListener('input', updateCalc);
+  distanceSlider.addEventListener('input', updateCalc);
+  updateCalc();
+
+  /* ---------- INTERACTIVE BACKGROUND PARTICLES ---------- */
+  (function(){
+    const canvas = document.getElementById('bg-canvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let W = 0, H = 0, particles = [], pointer = {x:-9999,y:-9999,active:false};
+
+    const DPR = window.devicePixelRatio || 1;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarse = window.matchMedia('(pointer:coarse)').matches;
+    if(reduceMotion || coarse){ // minimal background on mobile/reduced-motion
+      canvas.style.opacity = '0.25';
+    }
+
+    function resize(){ W = canvas.width = Math.floor(window.innerWidth * devicePixelRatio || 1);
+      H = canvas.height = Math.floor(window.innerHeight * DPR || 1);
+      canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
+      initParticles();
+    }
+
+    function rand(min,max){ return Math.random()*(max-min)+min; }
+
+    function initParticles(){
+      const area = (W/ DPR) * (H/ DPR);
+      const count = Math.min(140, Math.max(18, Math.floor(area * 0.00012)));
+      particles = [];
+      for(let i=0;i<count;i++) particles.push({
+        x: rand(0,W), y: rand(0,H), vx: rand(-0.22,0.22), vy: rand(-0.12,0.12), r: rand(1.2,4.0),
+        baseAlpha: rand(0.18,0.7), // preferred visible alpha on dark
+        alpha: 0, // start invisible so we can fade in
+        targetAlpha: 0
+      });
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      particles.forEach(p => {
+        // simple attraction / repulsion with pointer
+        if(pointer.active){
+          const dx = pointer.x*DPR - p.x; const dy = pointer.y*DPR - p.y; const d2 = dx*dx+dy*dy;
+          if(d2 < 160000){ // within ~400px
+            const force = (160000 - d2) / 160000; // 0..1
+            p.vx += (dx>0? -1:1) * 0.02 * force;
+            p.vy += (dy>0? -1:1) * 0.02 * force;
+          }
+        }
+        p.x += p.vx; p.y += p.vy;
+        // gentle damping
+        p.vx *= 0.995; p.vy *= 0.995;
+        // wrap
+        if(p.x < -20) p.x = W + 20; if(p.x > W + 20) p.x = -20;
+        if(p.y < -20) p.y = H + 20; if(p.y > H + 20) p.y = -20;
+
+        // decide surface brightness under the particle using computed style
+        const cx = p.x / DPR;
+        const cy = p.y / DPR;
+        let overLight = true;
+        let lum = 1;
+        try{
+          const els = document.elementsFromPoint(cx, cy);
+          const el = Array.isArray(els) ? els.find(e => e && e.id !== 'bg-canvas' && e.tagName !== 'CANVAS') : els;
+          if(el){
+            // if the element is inside a known light surface, skip drawing
+            const isInLightSection = !!el.closest && !!el.closest('section:not(.on-dark), footer, .dataset-cell, .calc-panel, .econ-col, .wrap:not(.on-dark)');
+            if(isInLightSection){ overLight = true; lum = 1; }
+            else {
+              const bg = window.getComputedStyle(el).backgroundColor || '';
+              const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+              if(m){
+                const r = +m[1], gcol = +m[2], b = +m[3];
+                lum = (0.2126 * r + 0.7152 * gcol + 0.0722 * b) / 255;
+                overLight = lum > 0.55;
+              } else {
+                overLight = !(el.closest && el.closest('.on-dark, .hero, .closing, .zero-banner'));
+              }
+            }
+          }
+        }catch(e){ overLight = true; }
+
+        const glowR = p.r * 16;
+        // determine desired alpha based on surface; fade smoothly to avoid popping
+        const desiredAlpha = overLight ? 0 : Math.max(p.baseAlpha, 0.45);
+        // lerp particle alpha toward desiredAlpha
+        p.alpha += (desiredAlpha - p.alpha) * 0.12;
+        // if effectively invisible, skip expensive drawing
+        if(p.alpha < 0.01) return;
+        // green particle color (consistent)
+        const green = {r:62,g:215,b:143};
+        // draw glow using current interpolated alpha
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+        g.addColorStop(0, `rgba(${green.r},${green.g},${green.b},${p.alpha})`);
+        g.addColorStop(0.45, `rgba(${green.r},${green.g},${green.b},${Math.max(0.06, p.alpha*0.6)})`);
+        g.addColorStop(1, `rgba(${green.r},${green.g},${green.b},0)`);
+        ctx.beginPath(); ctx.fillStyle = g; ctx.arc(p.x, p.y, glowR, 0, Math.PI*2); ctx.fill();
+        // solid core with subtle white stroke for contrast
+        const coreAlpha = Math.min(1, p.alpha*1.6);
+        ctx.beginPath(); ctx.fillStyle = `rgba(${green.r},${green.g},${green.b},${coreAlpha})`; ctx.arc(p.x, p.y, Math.max(1.4, p.r*2), 0, Math.PI*2); ctx.fill();
+        ctx.lineWidth = 0.9 * DPR;
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.stroke();
+      });
+    }
+
+    let rafId;
+    function loop(){ draw(); rafId = requestAnimationFrame(loop); }
+
+    // pointer handlers
+    window.addEventListener('mousemove', e => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; });
+    window.addEventListener('mouseleave', () => { pointer.active = false; pointer.x=-9999; pointer.y=-9999; });
+    window.addEventListener('touchstart', e => { const t = e.touches[0]; pointer.x = t.clientX; pointer.y = t.clientY; pointer.active=true; }, {passive:true});
+    window.addEventListener('touchmove', e => { const t = e.touches[0]; pointer.x = t.clientX; pointer.y = t.clientY; }, {passive:true});
+    window.addEventListener('touchend', () => { pointer.active=false; pointer.x=-9999; pointer.y=-9999; });
+
+      // resize + start
+      window.addEventListener('resize', () => { cancelAnimationFrame(rafId); resize(); rafId = requestAnimationFrame(loop); });
+    resize(); rafId = requestAnimationFrame(loop);
+  })();
+
+    /* ---------- DIRECTIONAL SCROLL REVEAL (improved) ---------- */
+    // keep a scroll-direction flag updated so reveals can animate differently when scrolling up vs down
+    let scrollDir = 'down';
+    let _lastScrollY = window.scrollY || 0;
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY || 0;
+      scrollDir = (y > _lastScrollY) ? 'down' : (y < _lastScrollY) ? 'up' : scrollDir;
+      _lastScrollY = y;
+    }, {passive:true});
+
+    // ensure grouped elements use animationDelay as well as transitionDelay for stagger
+    document.querySelectorAll('.ledger, .dataset-grid, .steps').forEach(group => {
+      group.querySelectorAll('.ledger-row, .dataset-cell, .step').forEach((el,i) => {
+        const d = (i*90)+'ms'; el.style.transitionDelay = d; el.style.animationDelay = d;
+      });
+    });
+
+    const revealEls2 = document.querySelectorAll('[data-reveal], .ledger-row, .dataset-cell, .step');
+    const io2 = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const el = entry.target;
+        if(entry.isIntersecting){
+          el.classList.add('in-view');
+          if(scrollDir === 'down') { el.classList.add('in-view-down'); el.classList.remove('in-view-up'); }
+          else { el.classList.add('in-view-up'); el.classList.remove('in-view-down'); }
+        } else {
+          el.classList.remove('in-view'); el.classList.remove('in-view-down'); el.classList.remove('in-view-up');
+        }
+      });
+    }, {threshold:0.15});
+    revealEls2.forEach(el => io2.observe(el));
+
+  /* ---------- INTERACTIVE LEAFLET MAP ---------- */
+  (function(){
+    const mapEl = document.getElementById('map');
+    if(!mapEl) return;
+
+    function showMapError(msg){
+      mapEl.innerHTML = `<div style="padding:28px; color:var(--ink); background:var(--paper); border-radius:8px;">${msg}</div>`;
+    }
+
+    function initLeaflet(){
+      try{
+        const map = L.map('map', { scrollWheelZoom: false }).setView([30.9,75.85], 7);
+
+        // try multiple tile providers if one is blocked or fails
+        // prefer providers that are less likely blocked; OSM last
+        const providers = [
+          { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: 'Tiles © Esri' },
+          { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attribution: 'Tiles © CARTO', subdomains:['a','b','c','d'] },
+          { url: 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg', attribution: 'Map tiles by Stamen Design', subdomains:['a','b','c','d'] },
+          { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: 'Tiles © OpenStreetMap contributors', subdomains:['a','b','c'] }
+        ];
+
+        function tryProvider(i){
+          if(i >= providers.length){
+            // no providers worked
+            map.getContainer().innerHTML = '<div style="padding:28px; color:var(--ink); background:var(--paper); border-radius:8px;">Map tiles unavailable.</div>';
+            return;
+          }
+          const p = providers[i];
+          const layer = L.tileLayer(p.url, { maxZoom: 18, attribution: p.attribution, subdomains: p.subdomains || [] });
+          let errors = 0; let loaded = false;
+          // try the next provider sooner if we see several tile errors
+          layer.on('tileerror', () => { errors++; if(errors > 2 && !loaded){ tryProvider(i+1); } });
+          layer.on('load', () => { loaded = true; /* success */ });
+          layer.addTo(map);
+          // safety timeout: if after 2s we saw many errors, try next
+          setTimeout(() => { if(!loaded && errors > 2){ map.removeLayer(layer); tryProvider(i+1); } }, 2000);
+        }
+        tryProvider(0);
+
+        const samples = [
+          {lat:30.904, lng:75.857, title:'Example cluster — Ludhiana region', desc:'Sample aggregated listing area.'},
+          {lat:29.0588, lng:76.0856, title:'Haryana sample', desc:'Nearby rural cluster.'},
+          {lat:31.1471, lng:75.3412, title:'Amritsar area', desc:'High-residue district sample.'}
+        ];
+        samples.forEach(s => {
+          const m = L.marker([s.lat,s.lng]).addTo(map);
+          m.bindPopup(`<strong>${s.title}</strong><br>${s.desc}`);
+        });
+
+        // UX: enable wheel-zoom briefly after click to avoid accidental scroll hijack
+        map.on('click', () => { map.scrollWheelZoom.enable(); setTimeout(() => map.scrollWheelZoom.disable(), 6000); });
+
+        // ensure proper rendering if container size changed
+        setTimeout(() => { try{ map.invalidateSize(); }catch(e){} }, 300);
+      }catch(err){ showMapError('Map failed to initialize.'); }
+    }
+
+    // If Leaflet already loaded, init immediately
+    if(window.L){ initLeaflet(); return; }
+
+    // ensure leaflet CSS is present (only add if not already)
+    if(!document.querySelector('link[href*="leaflet"]')){
+      const lcss = document.createElement('link'); lcss.rel='stylesheet'; lcss.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(lcss);
+    }
+
+    // load leaflet script dynamically
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.defer = true; s.onload = () => setTimeout(initLeaflet, 40);
+    s.onerror = () => showMapError('Map scripts failed to load.');
+    document.head.appendChild(s);
+  })();
+});
+</script>
+</body>
+</html>
